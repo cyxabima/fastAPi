@@ -82,16 +82,28 @@ async def post(id: int, response: Response):
 
 
 @app.put("/post/{id}")
-async def update_post(id: int):
-    pass
+async def update_post(id: int, post: Post):
+    index = find_post_index(id)
+    print(index)
+    if index is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"post with id {id} Does not exit",
+        )
+    print(post.dict())
+    updated_post = post.dict()
+    updated_post["id"] = id
+    all_posts[index] = updated_post
+
+    return {"data": updated_post}
 
 
 @app.delete("/post/{id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_post(id: int, response: Response):
     post_index = find_post_index(id)
-    if not post_index:
-        response.status_code = status.HTTP_404_NOT_FOUND
-        return HTTPException(
+    if post_index is None:
+        # response.status_code = status.HTTP_404_NOT_FOUND no need if your are raising exception
+        raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"post with id {id} Does not exit",
         )
