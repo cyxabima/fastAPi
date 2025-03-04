@@ -2,7 +2,9 @@
 from fastapi import FastAPI, Response, HTTPException, status
 from pydantic import BaseModel
 from typing import Optional
-from random import randint
+
+# import psycopg
+from connectDB import db_connect
 
 app = FastAPI()
 all_posts: list[dict] = [
@@ -21,6 +23,8 @@ all_posts: list[dict] = [
         "id": 2,
     },
 ]
+
+conn, cursor = db_connect()
 
 
 def find_post(id):
@@ -50,29 +54,27 @@ async def root():
 
 @app.get("/posts")
 async def posts():
+    cursor.execute("SELECT * FROM posts")
+    all_posts = cursor.fetchall()
     return {"Posts": all_posts}
-
-
-#  with out validation of Schema Using body from fastapi params
-# @app.get("/createPost")
-# async def create_post(payload: dict = Body(...)):
-#     print(payload)
-#     return {"message": "post Created Successfully", "data": payload}
 
 
 @app.post("/post", status_code=status.HTTP_201_CREATED)
 async def create_post(post: Post):
-    #  automatically validate data will from body will be store in obj post of c;ass Post
-    created_post: dict = post.dict()
-    created_post["id"] = randint(1, 100000000000000)
-    all_posts.append(created_post)
-    return {"new_post": created_post}
+    cursor.execute(
+        """INSERT INTO posts (title, content, published) VALUES (%s, %s, %s) RETURNING * """,
+        (post.title, post.content, post.published),
+    )
+    new_post = cursor.fetchone()
+    conn.commit()
+    return {"new_post": new_post}
 
 
 @app.get("/post/{id}")  # in js it is /post/:id
 async def post(id: int, response: Response):
-    # id validation is automatically be handle as we have provided type annotation
-    post = find_post(id)
+    cursor.execute("""SELECT * FROM posts WHERE id = %s""", (str(id),))
+    post = cursor.fetchone()
+
     if not post:
         response.status_code = status.HTTP_404_NOT_FOUND
         return HTTPException(
@@ -83,29 +85,30 @@ async def post(id: int, response: Response):
 
 @app.put("/post/{id}")
 async def update_post(id: int, post: Post):
-    index = find_post_index(id)
-    print(index)
-    if index is None:
+    cursor.execute(
+        """UPDATE posts SET title = %s , content = %s , published = %s WHERE id = %s RETURNING * """,
+        (post.title, post.content, post.published, str(id)),
+    )
+    updated_post = cursor.fetchone()
+    conn.commit()
+
+    if not updated_post:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"post with id {id} Does not exit",
         )
-    print(post.dict())
-    updated_post = post.dict()
-    updated_post["id"] = id
-    all_posts[index] = updated_post
 
     return {"data": updated_post}
 
 
 @app.delete("/post/{id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_post(id: int, response: Response):
-    post_index = find_post_index(id)
-    if post_index is None:
-        # response.status_code = status.HTTP_404_NOT_FOUND no need if your are raising exception
+    cursor.execute("""DELETE FROM posts WHERE id = %s RETURNING *""", (str(id),))
+    post = cursor.fetchone()
+    conn.commit()
+    if not post:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"post with id {id} Does not exit",
         )
-    all_posts.pop(post_index)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
