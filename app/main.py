@@ -7,15 +7,12 @@ from pydantic import BaseModel
 # from pydantic.type_adapter import P
 from . import models
 from .database import engine, get_db
-from .connectDB import db_connect
 from sqlalchemy.orm import Session
 
 
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
-
-conn, cursor = db_connect()
 
 
 class Post(BaseModel):
@@ -39,20 +36,12 @@ async def root():
 
 @app.get("/posts")
 async def posts(db: Session = Depends(get_db)):
-    # cursor.execute("SELECT * FROM posts")
-    # all_posts = cursor.fetchall()
     posts = db.query(models.Post).all()
     return {"data": posts}
 
 
 @app.post("/post", status_code=status.HTTP_201_CREATED)
 async def create_post(post: Post, db: Session = Depends(get_db)):
-    # cursor.execute(
-    #     """INSERT INTO posts (title, content, published) VALUES (%s, %s, %s) RETURNING * """,
-    #     (post.title, post.content, post.published),
-    # )
-    # new_post = cursor.fetchone()
-    # conn.commit()
     # ! to type every attribute from pydantic models instead used post.dict() then unpack it
     new_post = models.Post(**post.dict())
     db.add(new_post)
@@ -63,8 +52,6 @@ async def create_post(post: Post, db: Session = Depends(get_db)):
 
 @app.get("/post/{id}")  # in js it is /post/:id
 async def post(id: int, post: Post, db: Session = Depends(get_db)):
-    # cursor.execute("""SELECT * FROM posts WHERE id = %s""", (str(id),))
-    # post = cursor.fetchone()
     post = db.query(models.Post).filter(models.Post.id == id).first()
 
     if not post:
@@ -76,12 +63,6 @@ async def post(id: int, post: Post, db: Session = Depends(get_db)):
 
 @app.put("/post/{id}")
 async def update_post(id: int, post: Post, db: Session = Depends(get_db)):
-    # cursor.execute(
-    #     """UPDATE posts SET title = %s , content = %s , published = %s WHERE id = %s RETURNING * """,
-    #     (post.title, post.content, post.published, str(id)),
-    # )
-    # updated_post = cursor.fetchone()
-    # conn.commit()
     post_query = db.query(models.Post).filter(models.Post.id == id)
     if not post_query.first():
         raise HTTPException(
@@ -95,9 +76,6 @@ async def update_post(id: int, post: Post, db: Session = Depends(get_db)):
 
 @app.delete("/post/{id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_post(id: int, db: Session = Depends(get_db)):
-    # cursor.execute("""DELETE FROM posts WHERE id = %s RETURNING *""", (str(id),))
-    # post = cursor.fetchone()
-    # conn.commit()
     post = db.query(models.Post).filter(models.Post.id == id)
 
     if not post.first():
