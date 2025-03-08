@@ -3,11 +3,12 @@ from dotenv import load_dotenv
 
 
 class Settings(BaseSettings):
-    database_name: str
-    database_host: str
-    database_port: str
-    database_user: str
-    database_password: str
+    # database_name: str
+    # database_host: str
+    # database_port: str
+    # database_user: str
+    # database_password: str
+    database_uri: str
     secret_key: str
     algorithm: str
     access_token_expire_minutes: int
