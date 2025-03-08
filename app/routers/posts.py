@@ -53,7 +53,7 @@ def posts(
     # static or a class variable which unpack a dict or object and called the constructor
 
     # just for learning  i  have implemented both way in join methods manual way in all\
-    # post and model_validate way in getting only one posta
+    # post and model_validate way in getting only one post
 
 
 @router.post("/post", status_code=status.HTTP_201_CREATED, response_model=schema.Post)
