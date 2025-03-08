@@ -1,5 +1,6 @@
 from typing import Optional
 from fastapi import APIRouter, Response, HTTPException, status, Depends
+from sqlalchemy.sql import func
 
 from app import oauth2
 from app import models
@@ -10,21 +11,49 @@ from app import schema
 router = APIRouter(prefix="/api/v1", tags=["Posts"])
 
 
-@router.get("/posts", response_model=list[schema.Post])
+@router.get("/posts", response_model=list[schema.PostWithVotes])
 def posts(
     db: Session = Depends(get_db),
     limit: int = 10,
     skip: int = 0,
     search: Optional[str] = "",
 ):
-    posts = (
-        db.query(models.Post)
+    posts_with_votes = (
+        db.query(models.Post, func.count(models.Vote.post_id).label("votes"))
+        .outerjoin(models.Vote, models.Vote.post_id == models.Post.id)
+        .group_by(models.Post.id)
         .filter(models.Post.title.contains(search))
         .limit(limit)
         .offset(skip)
         .all()
     )
-    return [schema.Post.model_validate(post) for post in posts]
+
+    return [
+        schema.PostWithVotes(
+            id=post.id,
+            title=post.title,
+            content=post.content,
+            published=post.published,
+            created_at=post.created_at,
+            owner_id=post.owner_id,
+            votes=votes,
+            owner=post.owner,
+        )
+        for post, votes in posts_with_votes
+    ]
+
+    # why this work as __annotation__  of class PoST with vote contains all attribute with \
+    # is used by pydantic BaseModel to validate type and variable name in constructor there\
+    #  we are manually providing these attribute and to model it was not validating \
+    # previously because query is returning tuple of posts and owner which is impossible to\
+    # validate directly we could validate it by changing our schema to post: Post vote: int\
+    # or by manually providing these all attributes in constructor\
+
+    # return schema.Post.model_validate(new_post) this work on the same principle it is\
+    # static or a class variable which unpack a dict or object and called the constructor
+
+    # just for learning  i  have implemented both way in join methods manual way in all\
+    # post and model_validate way in getting only one posta
 
 
 @router.post("/post", status_code=status.HTTP_201_CREATED, response_model=schema.Post)
@@ -41,18 +70,23 @@ def create_post(
     return schema.Post.model_validate(new_post)
 
 
-@router.get("/post/{id}", response_model=schema.Post)  # in js it is /post/:id
+@router.get("/post/{id}", response_model=schema.PostWithVotes___)
 def post(
     id: int,
     db: Session = Depends(get_db),
 ):
-    post = db.query(models.Post).filter(models.Post.id == id).first()
+    post = (
+        db.query(models.Post, func.count(models.Vote.post_id).label("votes"))
+        .outerjoin(models.Vote, models.Vote.post_id == models.Post.id)
+        .group_by(models.Post.id)
+        .first()
+    )
 
     if not post:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Post not Found"
         )
-    return schema.Post.model_validate(post)
+    return schema.PostWithVotes___.model_validate(post)
 
 
 @router.put("/post/{id}", response_model=schema.Post)

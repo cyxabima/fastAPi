@@ -20,6 +20,7 @@ class Post(Base):
     )
 
     owner = relationship("User")
+    votes = relationship("Vote")
 
 
 class User(Base):
