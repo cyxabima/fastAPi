@@ -23,4 +23,4 @@ load_dotenv()
 
 
 # Now create settings
-settings = Settings()
+settings = Settings()  # do not take tension all data is coming from .env file
